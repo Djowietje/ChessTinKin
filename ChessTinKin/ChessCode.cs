@@ -1,0 +1,259 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace ChessTinKin
+{
+    class ChessCode
+    {
+        ChessUI UI;
+
+        int xOffset = 0;
+        int yOffset = 24;
+
+        Graphics graphics;
+
+        int chessWidth = 560;
+        int chessHeight = 560;
+
+        ChessPiece[] WhitePieces = new ChessPiece[16];
+        ChessPiece[] BlackPieces = new ChessPiece[16];
+
+        public void Run(ChessUI _UI)
+        {
+            UI = _UI;
+            initDefaultLayout();
+            
+
+        }
+
+
+        public void initDefaultLayout()
+        {
+            //Background
+            Image bgImage = Image.FromFile("Pictures/ChessBoard.png");
+            Image scaledBG = ScaleImage(bgImage, chessWidth, chessHeight);
+            
+
+
+            Console.WriteLine("BG Image =" + scaledBG.Height + "," + scaledBG.Width + "  (H,W)" + "  BG Box = " + scaledBG.Height + "," + scaledBG.Width + "  (H,W)");
+
+            //INIT PAWNS
+            for (int i = 0; i < 8; i++)
+            {
+                WhitePieces[i] = new ChessPiece(ChessPiece.ChessNames.Pawn, ChessPiece.ChessColor.White,i);
+
+            }
+            
+            //INIT Other Chesspieces
+            WhitePieces[8] = new ChessPiece(ChessPiece.ChessNames.Rook, ChessPiece.ChessColor.White,0);
+            WhitePieces[9] = new ChessPiece(ChessPiece.ChessNames.Knight, ChessPiece.ChessColor.White,0);
+            WhitePieces[10] = new ChessPiece(ChessPiece.ChessNames.Bishop, ChessPiece.ChessColor.White,0);
+            WhitePieces[11] = new ChessPiece(ChessPiece.ChessNames.King, ChessPiece.ChessColor.White,0);
+            WhitePieces[12] = new ChessPiece(ChessPiece.ChessNames.Queen, ChessPiece.ChessColor.White,0);
+            WhitePieces[13] = new ChessPiece(ChessPiece.ChessNames.Bishop, ChessPiece.ChessColor.White,1);
+            WhitePieces[14] = new ChessPiece(ChessPiece.ChessNames.Knight, ChessPiece.ChessColor.White,1);
+            WhitePieces[15] = new ChessPiece(ChessPiece.ChessNames.Rook, ChessPiece.ChessColor.White,1);
+
+            //BlackPieces = (ChessPiece[]) WhitePieces.Clone();
+            //Array.Copy(WhitePieces, BlackPieces, 16);
+            for (int i = 0; i < 16; i++)
+            {
+                BlackPieces[i] = new ChessPiece(WhitePieces[i].chessName, ChessPiece.ChessColor.Black, WhitePieces[i].pieceID);
+                BlackPieces[i].loadImage(BlackPieces[i].chessName, BlackPieces[i].chessColor);
+            }
+
+            //Calculate all locations (pixels)
+            foreach (ChessPiece cp in WhitePieces)
+            {
+                cp.Location = convertChessPosToPix(cp.currentPosition);
+            }
+            foreach (ChessPiece cp in BlackPieces)
+            {
+                cp.Location = convertChessPosToPix(cp.currentPosition);
+            }
+
+
+            //Add 'Controls' to UI
+            UI.Invoke(new Action(() => {
+
+                UI.mainPanel.Click += MainPanel_Click;
+                
+                //add all pieces
+                foreach (ChessPiece cp in WhitePieces)
+                {
+                    cp.generatePictureBox();
+                    cp.Click += ControlBox_Click;
+                    UI.mainPanel.Controls.Add(cp);
+                }
+                foreach (ChessPiece cp in BlackPieces)
+                {
+                    cp.generatePictureBox();
+                    cp.Click += ControlBox_Click;
+                    UI.mainPanel.Controls.Add(cp);
+                }
+
+                //Add BG and configure Window:
+                UI.Size = new Size(scaledBG.Width, scaledBG.Height+yOffset);
+                UI.mainPanel.BackgroundImage = scaledBG;
+                UI.mainPanel.Location = new Point(0, 24);
+                UI.mainPanel.Size = new Size(scaledBG.Width, scaledBG.Height);
+                UI.mainPanel.SendToBack();
+
+            }));
+
+        }
+
+        private void MainPanel_Click(object sender, EventArgs e)
+        {
+            if (((MouseEventArgs)e).Button == MouseButtons.Right)
+            {
+                //Right mouse button is deselect all (for convienience)
+
+            }
+            else {
+                Point coords = ((Panel)sender).PointToClient(Cursor.Position);
+
+                //dividing coords by 70 (height and width of each field on the board) and removing decimals gives us the field in which was clicked
+
+                int xclick = Convert.ToInt32(Math.Floor((double)(coords.X / 70))); // 
+                int yclick = Convert.ToInt32(Math.Floor((double)(coords.Y / 70)));
+
+                Point moveTo = new Point(xclick, yclick);
+
+                //Console output for debug purposes
+                // (8-yclick) to reverse the order (bottom row is 1, upper is 8, not otherway around)
+                // (xclick+1) because far left is 1 (or A) not 0.
+                Console.WriteLine("Mainpanel Field: " + convertNumberToLetter(xclick+1) + (8-yclick) + "  clicked");
+                //Check for selected chesspiece
+                foreach (ChessPiece cp in WhitePieces)
+                {
+                    if (cp.selected == true) { moveChessPiece(cp, moveTo); }
+                }
+                foreach (ChessPiece cp in BlackPieces)
+                {
+                    if (cp.selected == true) { moveChessPiece(cp, moveTo); }
+                }
+            }
+        }
+
+        private void moveChessPiece(ChessPiece cp, Point moveTo)
+        {
+            //TODO: CHECK MOVE VALIDITY
+
+            //MOVE CHESSPIECE
+            cp.Location = new Point(moveTo.X * 70, moveTo.Y * 70);
+        }
+        private void ControlBox_Click(object sender, EventArgs e)
+        {
+            //Check all chesspieces if one is selected, if true -> deselect,  if not the same as selected now, select new
+            bool deselect = false;
+
+            //Console output for debug purposes
+            Console.WriteLine("Chesspiece " + ((ChessPiece)sender).chessName + " with ID:" + ((ChessPiece)sender).pieceID + " was clicked.");
+
+
+            foreach (ChessPiece cp in WhitePieces)
+            {
+                if(cp.chessName == ((ChessPiece)sender).chessName && cp.pieceID == ((ChessPiece)sender).pieceID && cp.selected == true) { deselect = true; } // check if clicked one is the same as already selected
+                if(cp.selected == true) { cp.selected = false; cp.BorderStyle = BorderStyle.None; } // if not, deselect it
+            }
+
+            foreach (ChessPiece cp in BlackPieces)
+            {
+                if (cp.chessName == ((ChessPiece)sender).chessName && cp.pieceID == ((ChessPiece)sender).pieceID && cp.selected == true) { deselect = true; } // check if clicked one is the same as already selected
+                if (cp.selected == true) { cp.selected = false; cp.BorderStyle = BorderStyle.None; } // if not, deselect it
+            }
+
+            if (!deselect) // If the object clicked is not the same as the one selected then draw a border
+            {
+                ((ChessPiece)sender).selected = true;
+                ((ChessPiece)sender).BorderStyle = BorderStyle.FixedSingle;
+            }
+
+        }
+
+        public Bitmap ScaleImage(Image image, int maxWidth, int maxHeight)
+        {
+            var ratioX = (double)maxWidth / image.Width;
+            var ratioY = (double)maxHeight / image.Height;
+            var ratio = Math.Min(ratioX, ratioY);
+
+            var newWidth = (int)(image.Width * ratio);
+            var newHeight = (int)(image.Height * ratio);
+
+            var newImage = new Bitmap(newWidth, newHeight);
+            Graphics.FromImage(newImage).DrawImage(image, 0, 0, newWidth, newHeight);
+            Bitmap bmp = new Bitmap(newImage);
+
+            return bmp;
+        }
+
+        public Point convertChessPosToPix(string chessPos)
+        {
+            //Calculate Position ( A * B ) (Where board = 8*8)
+
+            int xPosPix = 0;
+            switch (chessPos.Substring(0,1))
+            {
+                case "A":
+                    xPosPix = 0;
+                    break;
+                case "B":
+                    xPosPix = 1;
+                    break;
+                case "C":
+                    xPosPix = 2;
+                    break;
+                case "D":
+                    xPosPix = 3;
+                    break;
+                case "E":
+                    xPosPix = 4;
+                    break;
+                case "F":
+                    xPosPix = 5;
+                    break;
+                case "G":
+                    xPosPix = 6;
+                    break;
+                case "H":
+                    xPosPix = 7;
+                    break;
+                default:
+                    break;
+            }
+            int yPosPix = Convert.ToInt32(chessPos.Substring(1, 1));
+            
+            //Convert Position A,B to pixels (*35)    
+            return new Point(xPosPix * 70, (yPosPix-1) * 70);
+        }
+
+        public string convertNumberToLetter(int number)
+        {
+            switch (number)
+            {
+                case 1:
+                    return "A";
+                case 2:
+                    return "B";
+                case 3:
+                    return "C";
+                case 4:
+                    return "D";
+                case 5:
+                    return "E";
+                case 6:
+                    return "F";
+                case 7:
+                    return "G";
+                default:
+                    return "Error";
+            }
+        }
+    }
+}
