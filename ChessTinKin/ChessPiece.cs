@@ -19,6 +19,10 @@ namespace ChessTinKin
 
         public int pieceID { get; set; }
 
+        public bool alive = true;
+
+        public string defaultPosition { get; set; }
+
         public string currentPosition { get; set; }
 
         public bool selected = false;
@@ -150,6 +154,7 @@ namespace ChessTinKin
                         break;
                 }
             }
+            defaultPosition = position;
             return position;
         }
 
